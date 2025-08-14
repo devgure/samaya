@@ -1,0 +1,144 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id              String    @id @default(uuid())
+  email           String    @unique
+  phone           String?   @unique
+  name            String
+  bio             String?
+  birthDate       DateTime?
+  gender          Gender?
+  preferredGender Gender?
+  photos          Photo[]
+  location        Location?
+  preferences     Preference?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  isVerified      Boolean   @default(false)
+  isPremium       Boolean   @default(false)
+  lastActive      DateTime  @default(now())
+  chatRooms       ChatRoomMember[]
+  likesGiven      Like[]    @relation("LikeSource")
+  likesReceived   Like[]    @relation("LikeTarget")
+  aiScore         Float?    // compatibility score
+  language        String?   @default("en")
+  subscription    Subscription?
+}
+
+enum Gender {
+  MALE
+  FEMALE
+  NON_BINARY
+  OTHER
+}
+
+model Photo {
+  id        String   @id @default(uuid())
+  userId    String
+  url       String
+  isMain    Boolean  @default(false)
+  facialFeatures Json?  // store face encoding, emotion, etc.
+  uploadedAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model Location {
+  id        String   @id @default(uuid())
+  userId    String   @unique
+  lat       Float
+  lng       Float
+  city      String?
+  country   String?
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id])
+}
+
+model Preference {
+  id                String   @id @default(uuid())
+  userId            String   @unique
+  minAge            Int      @default(18)
+  maxAge            Int      @default(99)
+  maxDistance       Int      @default(50) // km
+  showMe             Gender?
+  user              User     @relation(fields: [userId], references: [id])
+}
+
+model Like {
+  id         String   @id @default(uuid())
+  sourceId   String
+  targetId   String
+  likedAt    DateTime @default(now())
+  isMatch    Boolean  @default(false)
+
+  source     User     @relation("LikeSource", fields: [sourceId], references: [id])
+  target     User     @relation("LikeTarget", fields: [targetId], references: [id])
+
+  @@unique([sourceId, targetId])
+}
+
+model ChatRoom {
+  id         String           @id @default(uuid())
+  name       String?
+  members    ChatRoomMember[]
+  messages   Message[]
+  createdAt  DateTime         @default(now())
+}
+
+model ChatRoomMember {
+  id        String    @id @default(uuid())
+  roomId    String
+  userId    String
+  joinedAt  DateTime  @default(now())
+  leftAt    DateTime?
+
+  room      ChatRoom  @relation(fields: [roomId], references: [id])
+  user      User      @relation(fields: [userId], references: [id])
+
+  @@unique([roomId, userId])
+}
+
+model Message {
+  id         String   @id @default(uuid())
+  roomId     String
+  senderId   String
+  text       String
+  imageUrl   String?
+  read       Boolean  @default(false)
+  sentAt     DateTime @default(now())
+
+  room       ChatRoom @relation(fields: [roomId], references: [id])
+  sender     User     @relation(fields: [senderId], references: [id])
+}
+
+model Subscription {
+  id            String   @id @default(uuid())
+  userId        String   @unique
+  stripeId      String   @unique
+  status        String   // active, canceled, past_due
+  currentPeriodEnd DateTime
+  plan          String   // basic, premium
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user          User     @relation(fields: [userId], references: [id])
+}
+
+model Report {
+  id          String   @id @default(uuid())
+  reporterId  String
+  reportedId  String
+  reason      String
+  details     String?
+  createdAt   DateTime @default(now())
+
+  reporter    User     @relation("ReportSource", fields: [reporterId], references: [id])
+  reported    User     @relation("ReportTarget", fields: [reportedId], references: [id])
+}
